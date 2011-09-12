@@ -5,13 +5,20 @@
 %define tmpdir %{bamboo_tomcat}/tmp
 %define logdir %{bamboo_tomcat}/log
 
+%define tomcat_version 6.0.33
+%define tomcat_home %{_usr}/share/tomcat-%{tomcat_version}
+%define tomcat_user bamboo
+
 Name: tomcat-bamboo
 Version: 3.2.2
 
 Summary: Atlassian Bamboo Tomcat Profile
 Release: 1
-Source0: apache-tomcat-6.0.33.tar.gz
+Source0: apache-tomcat-%{tomcat_version}.tar.gz
 Source1: atlassian-bamboo-3.2.2.war
+Source2: tomcat-%{tomcat_version}.init
+Source3: tomcat-%{tomcat_version}.sysconfig
+
 Url: http://www.atlassian.com/software/bamboo/
 Group: System Environment/Daemons
 
@@ -27,7 +34,7 @@ Authors:
     Mark Wolfe <mark@wolfe.id.au>
 
 %prep
-%setup -q -n apache-tomcat-6.0.33
+%setup -q -n apache-tomcat-%{tomcat_version}
 
 %build
 # remove all the files already in base.
@@ -50,6 +57,16 @@ done
 %{__install} -d -m 0775 ${RPM_BUILD_ROOT}%{workdir}
 %{__install} -d -m 0775 ${RPM_BUILD_ROOT}%{tmpdir}
 /usr/bin/unzip "%{SOURCE1}" -d %{buildroot}%{bamboo_tomcat}/bamboo
+%{__install} -d -m 0755 ${RPM_BUILD_ROOT}%{_initrddir}
+%{__install} -d -m 0755 ${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d
+%{__install} -d -m 0755 ${RPM_BUILD_ROOT}%{_sysconfdir}/sysconfig
+%{__install} -m 0644 %{SOURCE2} \
+  ${RPM_BUILD_ROOT}%{_initrddir}/%{name}
+%{__sed} -e "s|\@\@\@TCHOME\@\@\@|%{tomcat_home}|g" \
+  -e "s|\@\@\@TCTEMP\@\@\@|%{tempdir}|g" \
+  -e "s|\@\@\@TCUSER\@\@\@|%{tomcat_user}|g" \
+  -e "s|\@\@\@LIBDIR\@\@\@|%{_libdir}|g" %{SOURCE3} \
+  > ${RPM_BUILD_ROOT}%{_sysconfdir}/sysconfig/%{name}
 
 %clean
 %{__rm} -rf %{buildroot}
@@ -58,8 +75,14 @@ done
 %{_sbindir}/groupadd -r bamboo &>/dev/null || :
 %{_sbindir}/useradd -g bamboo -s /bin/false -r -c "Bamboo Continuous Build server" -d "%{buildroot}%{bamboo_home}" bamboo &>/dev/null || :
 
+%post
+
+/sbin/chkconfig --add %{name}-tomcat
+
 %files
 %defattr(-,root,root,-)
+%attr(0755,root,root) %{_initrddir}/%{name}
+%config(noreplace) %{_sysconfdir}/sysconfig/%{name}
 %attr(0775,root,tomcat) %dir %{confdir}
 %attr(0775,root, tomcat) %{confdir}/Catalina
 # %dir %{confdir}/Catalina
