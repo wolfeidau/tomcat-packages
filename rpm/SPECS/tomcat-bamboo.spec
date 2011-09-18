@@ -73,8 +73,8 @@ done
 %{__rm} -rf %{buildroot}
 
 %pre
-%{_sbindir}/groupadd -r bamboo &>/dev/null || :
-%{_sbindir}/useradd -g bamboo -s /bin/false -r -c "Bamboo Continuous Build server" -d "%{buildroot}%{bamboo_home}" bamboo &>/dev/null || :
+%{_sbindir}/groupadd -r %{tomcat_user} &>/dev/null || :
+%{_sbindir}/useradd -g %{tomcat_user} -s /bin/false -r -c "Bamboo Continuous Build server" -d "%{buildroot}%{bamboo_home}" %{tomcat_user} &>/dev/null || :
 
 %post
 

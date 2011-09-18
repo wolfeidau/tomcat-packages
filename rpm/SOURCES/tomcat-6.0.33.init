@@ -5,13 +5,15 @@
 # chkconfig: - 80 20
 #
 ### BEGIN INIT INFO
-# Provides: tomcat6
-# Required-Start: $network $syslog
-# Required-Stop: $network $syslog
-# Default-Start:
-# Default-Stop:
-# Description: Release implementation for Servlet 2.5 and JSP 2.1
-# Short-Description: start and stop tomcat
+# Provides:          tomcat6
+# Required-Start:    $local_fs $remote_fs $network
+# Required-Stop:     $local_fs $remote_fs $network
+# Should-Start:      $named
+# Should-Stop:       $named
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start Tomcat.
+# Description:       Start the Tomcat servlet engine.
 ### END INIT INFO
 
 # Source LSB function library.
@@ -41,15 +43,59 @@ TOMCAT_SCRIPT="$CATALINA_HOME/bin/catalina.sh"
 # Tomcat program name
 TOMCAT_PROG="${NAME}"
 
-# Define the tomcat username
-TOMCAT_USER="${TOMCAT_USER:-tomcat}"
+function catalina_sh() {
 
-#JDK_DIRS="/usr/lib/jvm/java-6-sun"
+  # Escape any double quotes in the value of JAVA_OPTS
+  JAVA_OPTS="$(echo $JAVA_OPTS | sed 's/\"/\\\"/g')"
+
+  TOMCAT_SH="set -a; JAVA_HOME=\"$JAVA_HOME\"; source \"$DEFAULT\"; \
+    CATALINA_HOME=\"$CATALINA_HOME\"; \
+    CATALINA_BASE=\"$CATALINA_BASE\"; \
+    JAVA_OPTS=\"$JAVA_OPTS\"; \
+    CATALINA_PID=\"$CATALINA_PID\"; \
+    cd \"$CATALINA_BASE\"; \
+    \"$CATALINA_SH\" $@"
+
+  # Run the catalina.sh script as a daemon
+  set +e
+  touch "$CATALINA_PID" "$CATALINA_BASE"/logs/catalina.out
+  chown $TOMCAT6_USER "$CATALINA_PID" "$CATALINA_BASE"/logs/catalina.out
+  start-stop-daemon --start -b -u "$TOMCAT_USER" \
+    -c "$TOMCAT_USER" -p "$CATALINA_PID" \
+    -x /bin/bash -- -c "$TOMCAT_SH"
+  STATUS="$?"
+  set +a -e
+  return $STATUS
+
+}
 
 # See how we were called.
 function start() {
 
+   # check whether the java home is set
+   if [ -z "$JAVA_HOME" ]; then
+     log_failure_msg "no JDK found - please set JAVA_HOME"
+     exit 1
+   fi
+
+   if [ ! -d "$CATALINA_BASE/conf" ]; then
+     log_failure_msg "invalid CATALINA_BASE: $CATALINA_BASE"
+     exit 1
+   fi
+
    echo -n "Starting ${TOMCAT_PROG}: "
+   if start-stop-daemon --test --start --pidfile "$CATALINA_PID" \
+     --user $TOMCAT6_USER --exec "$JAVA_HOME/bin/java" \
+     >/dev/null; then
+
+     catalina_sh start
+
+     sleep 5
+
+   else
+     log_progress_msg "(already running)" 
+     exit 0
+   fi
 }
 
 function stop() {
@@ -59,7 +105,7 @@ function stop() {
 
 function usage()
 {
-   echo "Usage: $0 {start|stop|restart|condrestart|try-restart|reload|force-reload|status|version}"
+   echo "Usage: $0 {start|stop|restart|status|version}"
    RETVAL="2"
 }
 
